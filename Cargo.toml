@@ -8,6 +8,10 @@ edition = "2021"
 default = ["secrecy"]
 secrecy = ["dep:secrecy"]
 
+[[example]]
+name = "cli"
+required-features = ["secrecy"]
+
 [dependencies]
 byterepr = "0.1.0"
 itertools = "0.10.5"

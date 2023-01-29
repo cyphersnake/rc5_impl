@@ -1,5 +1,8 @@
 use std::{error, fmt};
 
+#[cfg(feature = "secrecy")]
+pub use secrecy;
+
 mod key;
 pub use key::Key;
 
@@ -7,7 +10,7 @@ mod word;
 pub use word::Word;
 
 mod block;
-use block::{DecodeBlocks, EncodeBlocks};
+use block::{DecodeAsBlocks, EncodeAsBlocks};
 
 mod settings;
 pub use settings::{DefaultWord, Rc5Settings};
@@ -37,50 +40,70 @@ impl From<block::Error> for Error {
 }
 
 pub trait EncodeRc5 {
+    /// Encode by RC5 with custom settings
+    ///
+    /// Check 4.1 in [the specification](https://www.grc.com/r&d/rc5.pdf).
+    /// This function splits `Self` into blocks
+    /// (pair of words) and executes the RC5 encryption algorithm
+    /// `Error` - if `&self` cannot be divided into blocks!
     fn encode_rc5_with_settings<W: Word>(
         &self,
         key: impl Key,
         settings: Rc5Settings<W>,
     ) -> Result<Vec<u8>, Error>;
 
+    /// Encode by RC5 with default settings (32/12/b)
+    ///
+    /// Check 4.1 in [the specification](https://www.grc.com/r&d/rc5.pdf).
+    /// This function splits `Self` into blocks
+    /// (pair of words) and executes the RC5 encryption algorithm
+    /// `Error` - if `&self` cannot be divided into blocks!
     fn encode_rc5(&self, key: impl Key) -> Result<Vec<u8>, Error> {
         self.encode_rc5_with_settings(key, Rc5Settings::default())
     }
 }
 
 pub trait DecodeRc5 {
+    /// Decode by RC5 with custom settings
+    ///
+    /// Check 4.1 in [the specification](https://www.grc.com/r&d/rc5.pdf).
+    /// This function splits `Self` into blocks
+    /// (pair of words) and executes the RC5 encryption algorithm
+    /// `Error` - if `&self` cannot be divided into blocks!
     fn decode_rc5_with_settings<W: Word>(
         &self,
         key: impl Key,
         settings: Rc5Settings<W>,
     ) -> Result<Vec<u8>, Error>;
 
+    /// Decode by RC5 with default settings (32/12/b)
+    ///
+    /// Check 4.1 in [the specification](https://www.grc.com/r&d/rc5.pdf).
+    /// This function splits `Self` into blocks
+    /// (pair of words) and executes the RC5 encryption algorithm
+    /// `Error` - if `&self` cannot be divided into blocks!
     fn decode_rc5(&self, key: impl Key) -> Result<Vec<u8>, Error> {
         self.decode_rc5_with_settings(key, Rc5Settings::default())
     }
 }
 
-impl<T: AsRef<[u8]>> EncodeRc5 for T {
+impl<T: EncodeAsBlocks> EncodeRc5 for T {
     fn encode_rc5_with_settings<W: Word>(
         &self,
         key: impl Key,
         settings: Rc5Settings<W>,
     ) -> Result<Vec<u8>, Error> {
-        Ok(self
-            .as_ref()
-            .encode_blocks::<W>(key, settings.rounds_count)?)
+        Ok(self.encode_as_blocks::<W>(key, settings.rounds_count)?)
     }
 }
 
-impl<T: AsRef<[u8]>> DecodeRc5 for T {
+impl<T: DecodeAsBlocks> DecodeRc5 for T {
     fn decode_rc5_with_settings<W: Word>(
         &self,
         key: impl Key,
         settings: Rc5Settings<W>,
     ) -> Result<Vec<u8>, Error> {
-        Ok(self
-            .as_ref()
-            .decode_blocks::<W>(key, settings.rounds_count)?)
+        Ok(self.decode_as_blocks::<W>(key, settings.rounds_count)?)
     }
 }
 

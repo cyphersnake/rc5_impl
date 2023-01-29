@@ -15,29 +15,38 @@ pub enum Error {
     WrongInputSize,
 }
 
-pub(crate) trait DecodeBlocks {
-    fn decode_blocks<W: Word>(self, key: impl Key, round_count: u8) -> Result<Vec<u8>, Error>;
+pub(crate) trait DecodeAsBlocks {
+    /// This function splits `Self` into blocks (pair of words) and executes the RC5 encryption algorithm
+    /// `Error` - if `&self` cannot be divided into blocks!
+    fn decode_as_blocks<W: Word>(&self, key: impl Key, round_count: u8) -> Result<Vec<u8>, Error>;
 }
-impl DecodeBlocks for &[u8] {
-    fn decode_blocks<W: Word>(self, key: impl Key, round_count: u8) -> Result<Vec<u8>, Error> {
-        process_blocks(self, |b| {
-            decode(b, &key.mixin::<W>(round_count), round_count)
+impl<T: AsRef<[u8]>> DecodeAsBlocks for T {
+    fn decode_as_blocks<W: Word>(&self, key: impl Key, round_count: u8) -> Result<Vec<u8>, Error> {
+        process_blocks(self.as_ref(), |b| {
+            rc5_decode(b, &key.mixin::<W>(round_count), round_count)
         })
     }
 }
 
-pub(crate) trait EncodeBlocks {
-    fn encode_blocks<W: Word>(self, key: impl Key, round_count: u8) -> Result<Vec<u8>, Error>;
+pub(crate) trait EncodeAsBlocks {
+    /// This function splits `Self` into blocks (pair of words) and executes the RC5 decryption algorithm
+    /// `Error` - if `&self` cannot be divided into blocks!
+    fn encode_as_blocks<W: Word>(&self, key: impl Key, round_count: u8) -> Result<Vec<u8>, Error>;
 }
 
-impl EncodeBlocks for &[u8] {
-    fn encode_blocks<W: Word>(self, key: impl Key, round_count: u8) -> Result<Vec<u8>, Error> {
-        process_blocks(self, |b| {
-            encode(b, &key.mixin::<W>(round_count), round_count)
+impl<T: AsRef<[u8]>> EncodeAsBlocks for T {
+    fn encode_as_blocks<W: Word>(&self, key: impl Key, round_count: u8) -> Result<Vec<u8>, Error> {
+        process_blocks(self.as_ref(), |b| {
+            rc5_encode(b, &key.mixin::<W>(round_count), round_count)
         })
     }
 }
 
+/// The function splits the input into words
+/// and then into blocks and executes on
+/// each `processor` closure
+///
+/// `Error` - cannot be divided into blocks!
 fn process_blocks<W: Word>(
     input: &[u8],
     processor: impl Fn((W, W)) -> (W, W),
@@ -63,7 +72,9 @@ fn process_blocks<W: Word>(
         })
 }
 
-fn encode<W: Word>(block: (W, W), key_table: &[W], round_count: u8) -> (W, W) {
+/// RC5 Encode Function
+/// Check 4.1 in [the specification](https://www.grc.com/r&d/rc5.pdf).
+fn rc5_encode<W: Word>(block: (W, W), key_table: &[W], round_count: u8) -> (W, W) {
     let (mut a, mut b) = block;
 
     a = a.wrapping_add(&key_table[0]);
@@ -81,7 +92,9 @@ fn encode<W: Word>(block: (W, W), key_table: &[W], round_count: u8) -> (W, W) {
     (a, b)
 }
 
-fn decode<W: Word>(block: (W, W), key_table: &[W], round_count: u8) -> (W, W) {
+/// RC5 Decode Function
+/// Check 4.2 in [the specification](https://www.grc.com/r&d/rc5.pdf).
+fn rc5_decode<W: Word>(block: (W, W), key_table: &[W], round_count: u8) -> (W, W) {
     let (mut a, mut b) = block;
 
     for index in (1..=round_count as usize).rev() {
@@ -107,7 +120,7 @@ mod tests {
     #[test]
     fn test_encode() {
         assert_eq!(
-            encode((10u16, 10u16), &[0x00, 0x01, 0x02, 0x03], 1),
+            rc5_encode((10u16, 10u16), &[0x00, 0x01, 0x02, 0x03], 1),
             (2050, 8231)
         );
     }
@@ -115,7 +128,7 @@ mod tests {
     #[test]
     fn test_decode() {
         assert_eq!(
-            decode((2050u16, 8231), &[0x00, 0x01, 0x02, 0x03], 1),
+            rc5_decode((2050u16, 8231), &[0x00, 0x01, 0x02, 0x03], 1),
             (10, 10)
         );
     }

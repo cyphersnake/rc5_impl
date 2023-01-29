@@ -3,6 +3,25 @@ use std::{fmt::Debug, ops::AddAssign};
 use byterepr::ByteRepr;
 use num_traits::{PrimInt, WrappingAdd, WrappingSub, Zero};
 
+/// A trait presenter a word in RC5.
+///
+/// For more information, refer to section
+/// two of [the specification](https://www.grc.com/r&d/rc5.pdf).
+///
+/// # Quote from the specification
+///
+/// RC5 is word-oriented: all of the basic computational operations
+/// have `w`-bit  words as input and outputs. RC5 is a block cipher with two-rod input (plain-text)
+/// block size and a two-word (cipher-text) output block size.
+///
+/// The nominal choice for `w` is 32 bites, for which RC5 has 64-bit plaintext and ciphertext
+/// blocksizes. RC5 is well defined for any `w` > 0, although for simplicity it is proposed
+/// here that only th values 16, 32 and 64 be "allowable".
+///
+/// # Note
+/// As part of this crate, in addition to 16, 32 and 64, word sizes 8 and 128 were also implemented.
+/// This trait is also easy to adapt to any word size, but then you will have to manually implement
+/// all the operations that were presented here (for standard Rust types they are made immediately
 pub trait Word:
     Debug
     + Copy
@@ -16,7 +35,12 @@ pub trait Word:
     + WrappingAdd
     + WrappingSub
 {
+    // Count of bits inside word
+    // `u8` is here for simplicity. Potentially, in case of need,
+    // it is possible to expand the word length above 256,
+    // then you should expand the data type to usize
     const BITS: u8;
+    // Count of bytes inside word
     const BYTES: usize = (Self::BITS / 8) as usize;
 }
 
@@ -33,6 +57,10 @@ impl_word_size!(u32);
 impl_word_size!(u64);
 impl_word_size!(u128);
 
+/// Magic Const `P`
+/// `P_w = Odd(( e - 2 ) * 2 ^ w)`
+/// where `e` is base of natural logarithms
+/// and `w` is bit size of `Self`
 pub trait GetP {
     const P: Self;
 }
@@ -49,6 +77,10 @@ impl_p!(u32, 0xb7e15163);
 impl_p!(u64, 0xb7e151628aed2a6b);
 impl_p!(u128, 0xb7e151628aed2a6abf7158809cf4f3c7);
 
+/// Magic Const `Q`
+/// `P_w = Odd(( ф - 2 ) * 2 ^ w)`
+/// where `ф` is golden ratio
+/// and `w` is bit size of `Self`
 pub trait GetQ {
     const Q: Self;
 }
@@ -65,6 +97,8 @@ impl_q!(u32, 0x9e3779b9);
 impl_q!(u64, 0x9e3779b97f4a7c15);
 impl_q!(u128, 0x9e3779b97f4a7c15f39cc0605cedc835);
 
+/// Arithmetic progression module `2 ^ w` determined by the "magic constants"
+/// `P_w` & `Q_w` provided here from [`GetP`] & [`GetQ`] traits
 pub struct PresudoRandomKeySequenceIterator<T: Clone + WrappingAdd + GetP + GetQ> {
     next: T,
 }
@@ -138,6 +172,9 @@ mod presudo_random_key_sequence_test {
 }
 
 pub(crate) trait RotateWordLeft: Word {
+    /// Shifts the bits to the left by a specified amount,
+    /// `n` module `<Self as Word>::BITS`, wrapping the truncated
+    /// bits to the beginning of the resulting integer.
     fn rotate_word_left(self, n: Self) -> Self {
         self.rotate_left(
             n.rem(<Self as From<u8>>::from(Self::BITS))
@@ -149,6 +186,9 @@ pub(crate) trait RotateWordLeft: Word {
 impl<W: Word> RotateWordLeft for W {}
 
 pub(crate) trait RotateWordRight: Word {
+    /// Shifts the bits to the right by a specified amount,
+    /// `n` module `<Self as Word>::BITS`, wrapping the truncated
+    /// bits to the beginning of the resulting integer.
     fn rotate_word_right(self, n: Self) -> Self {
         self.rotate_right(
             n.rem(<Self as From<u8>>::from(Self::BITS))

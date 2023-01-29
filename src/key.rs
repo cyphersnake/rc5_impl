@@ -1,10 +1,21 @@
 use crate::word::{PresudoRandomKeySequenceIterator, RotateWordLeft, Word};
 
 pub trait Key {
+    /// Key length.
+    /// Anyone implementing their own key type
+    /// must provide the length of the key beforehand,
+    /// and also make sure it fits in u8, which automatically
+    /// implies a length limit of 0 to 255 inclusive
     const SIZE_HINT: u8;
     fn secret(&self) -> &[u8];
 }
 
+/// Converting the Secret Key from Bytes to Words
+///
+/// Copy the Secret key `K[0..b-1]` into an array `L[0..c-1]`
+/// of `c = [b/u]` words, where `u = w/8` is the number of bytes\words.
+/// Any unfilled byte positions of `L` are zeroes. In the case that
+/// `b = c = 0` we reset `c` to `1` and set `L[0]` to zero.
 fn expand_key_to_words<W: Word, K: Key>(key: &K) -> Vec<W> {
     let len = K::SIZE_HINT.max(1) as usize / W::BYTES;
     let mut words = vec![W::zero(); len];
@@ -21,6 +32,9 @@ fn expand_key_to_words<W: Word, K: Key>(key: &K) -> Vec<W> {
 }
 
 pub(crate) trait MixinKey: Key + Sized {
+    /// RC5 Key Mixin Function
+    /// Mix the secret key and presudo random key sequence
+    /// Check 4.3 in [the specification](https://www.grc.com/r&d/rc5.pdf).
     fn mixin<W: Word>(&self, rounds_count: u8) -> Vec<W> {
         let mut mixed_key =
             PresudoRandomKeySequenceIterator::<W>::collect_for_rounds_count(rounds_count);
