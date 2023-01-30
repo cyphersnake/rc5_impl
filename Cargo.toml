@@ -2,6 +2,10 @@
 name = "rc5_cypher"
 version = "0.0.1"
 authors = ["cyphersnake <cyphersnake@pm.me>"]
+description = "The rc5_cypher crate provides an implementation of the RC5 encryption algorithm"
+license = "MIT"
+keywords = [ "rc5", "encryption", "cryptography", "cipher", "cypher", "rust-crypto", "rust-cryptography" ]
+categories = ["cryptography"]
 edition = "2021"
 
 [features]
